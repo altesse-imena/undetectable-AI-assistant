@@ -3,9 +3,8 @@
   all(not(debug_assertions), target_os = "macos"),
   windows_subsystem = "transparent"
 )]
-use tauri::{Manager, Window, Position, PhysicalPosition, Runtime, Emitter};
+use tauri::{Manager, Window, Runtime, Emitter, PhysicalPosition, Position};
 use tauri_plugin_opener::init as opener_plugin;
-use tauri_plugin_global_shortcut::init as shortcut_plugin;
 use arboard::Clipboard;
 use once_cell::sync::Lazy;
 use std::{sync::{Arc, Mutex}, thread, time::{Duration, Instant}};
@@ -30,22 +29,37 @@ fn reset_timer() {
   let mut t = AUTO_HIDE.lock().unwrap(); *t = Instant::now();
 }
 
+#[tauri::command]
+fn toggle_widget_cmd<R: Runtime>(window: Window<R>) {
+  toggle_visibility(window);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
     .plugin(opener_plugin())
-    .plugin(shortcut_plugin())
     .setup(|app| {
       let handle = app.handle();
-      let window = handle.get_webview_window("main").unwrap();
-      // position window
-      window.set_position(Position::Physical(PhysicalPosition { x: 100, y: 100 })).unwrap();
-      // register global shortcut Cmd+H to toggle visibility
-      let mgr = handle.global_shortcut();
-      mgr.register("CMD+H", move |_| toggle_visibility(window.clone())).unwrap();
-      // clipboard monitor
+      // Get handle to main window
+      let main_window = app.get_webview_window("main").expect("Failed to get main window");
+      
+      // Create a second window for the widget
+      let widget_config = tauri::WebviewWindowBuilder::new(app, "widget", tauri::WebviewUrl::default())
+        .title("Clipboard Widget")
+        .inner_size(400.0, 300.0)
+        .transparent(true)
+        .decorations(false)
+        .always_on_top(true)
+        .resizable(false)
+        .visible(false);
+      
+      let widget = widget_config.build()
+        .expect("failed to build widget window");
+      widget.set_position(Position::Physical(PhysicalPosition { x: 100, y: 100 })).unwrap();
+      // The widget window is now created
+      // monitor clipboard and emit to widget
       {
-        let win = window.clone();
+        let w = widget.clone();
         let last = LAST_CLIPBOARD.clone();
         thread::spawn(move || {
           let mut cb = Clipboard::new().unwrap();
@@ -54,32 +68,29 @@ pub fn run() {
             if let Ok(content) = cb.get_text() {
               if !content.is_empty() && *last.lock().unwrap() != content {
                 *last.lock().unwrap() = content.clone();
-                win.emit("clipboard-changed", content.clone()).unwrap();
-                reset_timer();
-                if !win.is_visible().unwrap_or(false) {
-                  win.show().unwrap(); win.set_focus().unwrap();
-                }
+                w.emit("clipboard-changed", content.clone()).unwrap();
+                w.show().unwrap(); w.set_focus().unwrap();
+                let mut t = AUTO_HIDE.lock().unwrap(); *t = Instant::now();
               }
             }
           }
         });
       }
-      // auto-hide thread
+      // auto-hide widget after inactivity
       {
-        let win = window.clone();
+        let w = widget.clone();
         thread::spawn(move || {
           loop {
             thread::sleep(Duration::from_secs(1));
-            let since = AUTO_HIDE.lock().unwrap().elapsed();
-            if since.as_secs() > 30 && win.is_visible().unwrap_or(false) {
-              win.hide().unwrap();
+            if AUTO_HIDE.lock().unwrap().elapsed().as_secs() > 30 && w.is_visible().unwrap_or(false) {
+              w.hide().unwrap();
             }
           }
         });
       }
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![toggle_visibility])
+    .invoke_handler(tauri::generate_handler![toggle_visibility, toggle_widget_cmd])
     .run(tauri::generate_context!())
     .expect("error running stealth overlay");
 }

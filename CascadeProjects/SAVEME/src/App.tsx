@@ -1,8 +1,40 @@
 import { useState, useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/tauri';
 import './App.css';
 
 function App() {
+  const isWidget = window.location.hash === '#widget';
+  // Register keyboard shortcut listener
+  useEffect(() => {
+    if (isWidget) {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'h') {
+          invoke('toggle_widget_cmd');
+          e.preventDefault();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isWidget]);
+
+  if (!isWidget) {
+    return (
+      <div className="settings-container">
+        <h1>AI Assistant Settings</h1>
+        <div className="setting-item">Global shortcut: <strong>⌘+H</strong></div>
+        <button className="btn btn-primary" onClick={() => {
+          window.location.hash = '#widget';
+          // Open the widget window
+          invoke('toggle_widget_cmd');
+        }}>
+          Launch Widget
+        </button>
+      </div>
+    );
+  }
+
   const [clipboardContent, setClipboardContent] = useState<string>('');
   const [aiResponse, setAiResponse] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);

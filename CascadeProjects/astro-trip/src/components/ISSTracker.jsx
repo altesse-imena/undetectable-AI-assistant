@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { API_ENDPOINTS } from '../config';
 
 // Fix for default marker icons in Leaflet
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -38,7 +39,7 @@ const ISSTracker = ({ location: userLocation }) => {
   useEffect(() => {
     const fetchISSPosition = async () => {
       try {
-        const response = await axios.get('https://api.wheretheiss.at/v1/satellites/25544');
+        const response = await axios.get(API_ENDPOINTS.ISS_POSITION);
         const { latitude, longitude } = response.data;
         setIssPosition({ lat: parseFloat(latitude), lng: parseFloat(longitude) });
       } catch (err) {
@@ -63,7 +64,7 @@ const ISSTracker = ({ location: userLocation }) => {
       
       try {
         const response = await axios.get(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentLocation.lat}&lon=${currentLocation.lng}&zoom=10&addressdetails=1`
+          `${API_ENDPOINTS.REVERSE_GEOCODE}?format=json&lat=${currentLocation.lat}&lon=${currentLocation.lng}&zoom=10&addressdetails=1`
         );
         
         const { address } = response.data;
@@ -91,7 +92,7 @@ const ISSTracker = ({ location: userLocation }) => {
       setLoading(true);
       try {
         const response = await axios.get(
-          `https://iss-pass.herokuapp.com/json/?lat=${currentLocation.lat}&lon=${currentLocation.lng}`
+          `${API_ENDPOINTS.ISS_PASS}?lat=${currentLocation.lat}&lon=${currentLocation.lng}`
         );
         
         if (response.data && response.data.response && response.data.response.length > 0) {
@@ -140,134 +141,136 @@ const ISSTracker = ({ location: userLocation }) => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">ISS Tracker</h1>
-        <p className="text-gray-300">
-          Track the International Space Station in real-time
-        </p>
-      </div>
-
-      <div className="mb-6">
-        <Link to="/" className="btn bg-gray-700 hover:bg-gray-600 text-white inline-block mb-6">
-          Back to Dashboard
-        </Link>
-      </div>
-
-      {error && (
-        <div className="bg-red-900/50 border border-red-700 text-red-100 px-4 py-3 rounded relative mb-6" role="alert">
-          <strong className="font-bold">Error: </strong>
-          <span className="block sm:inline">{error}</span>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <div className="card">
-          <h2 className="text-xl font-bold mb-4">Current Location</h2>
-          {loading ? (
-            <div className="animate-pulse">
-              <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-              <div className="h-4 bg-gray-700 rounded w-1/2"></div>
+    <div className="container">
+      <section className="section">
+        <div className="content-center">
+          <h2>ISS TRACKER</h2>
+          <p className="mb-8">
+            TRACK THE INTERNATIONAL SPACE STATION AS IT ORBITS EARTH
+          </p>
+          
+          <div className="mb-6" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+            <Link to="/" className="btn">
+              BACK TO DASHBOARD
+            </Link>
+          </div>
+          
+          {error && (
+            <div style={{ maxWidth: '1200px', margin: '0 auto 20px', border: '1px solid rgba(255, 0, 0, 0.3)', padding: '20px', backgroundColor: 'rgba(0, 0, 0, 0.5)' }} role="alert">
+              <strong className="font-bold">ERROR: </strong>
+              <span className="block sm:inline">{error}</span>
             </div>
-          ) : (
-            <div>
-              <p className="text-gray-300">{locationName}</p>
-              {currentLocation && (
-                <p className="text-sm text-gray-400 mt-1">
-                  {currentLocation.lat.toFixed(4)}° N, {currentLocation.lng.toFixed(4)}° E
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div className="card">
+            <h3>CURRENT LOCATION</h3>
+            {loading ? (
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-700 w-3/4 mb-2"></div>
+                <div className="h-4 bg-gray-700 w-1/2"></div>
+              </div>
+            ) : (
+              <div>
+                <p>{locationName}</p>
+                {currentLocation && (
+                  <p style={{ opacity: '0.7', fontSize: '14px', marginTop: '10px' }}>
+                    {currentLocation.lat.toFixed(4)}° N, {currentLocation.lng.toFixed(4)}° E
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="card">
+            <h3>NEXT ISS PASS</h3>
+            {loading ? (
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-700 w-3/4 mb-2"></div>
+                <div className="h-4 bg-gray-700 w-1/2"></div>
+              </div>
+            ) : nextPass ? (
+              <div>
+                <p>{formatDate(nextPass.time)}</p>
+                <p style={{ opacity: '0.7', fontSize: '14px', marginTop: '10px' }}>
+                  VISIBLE FOR ~{nextPass.duration} MINUTES
                 </p>
-              )}
-            </div>
-          )}
+              </div>
+            ) : (
+              <p style={{ opacity: '0.7' }}>NO UPCOMING PASSES FOUND</p>
+            )}
+          </div>
+
+          <div className="card">
+            <h3>CURRENT ISS POSITION</h3>
+            {issPosition ? (
+              <div>
+                <p>
+                  {Math.abs(issPosition.lat).toFixed(2)}° {issPosition.lat >= 0 ? 'N' : 'S'}, 
+                  {Math.abs(issPosition.lng).toFixed(2)}° {issPosition.lng >= 0 ? 'E' : 'W'}
+                </p>
+                <p style={{ opacity: '0.7', fontSize: '14px', marginTop: '10px' }}>
+                  UPDATED: {new Date().toLocaleTimeString()}
+                </p>
+              </div>
+            ) : (
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-700 w-3/4"></div>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="card">
-          <h2 className="text-xl font-bold mb-4">Next ISS Pass Overhead</h2>
-          {loading ? (
-            <div className="animate-pulse">
-              <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-              <div className="h-4 bg-gray-700 rounded w-1/2"></div>
-            </div>
-          ) : nextPass ? (
-            <div>
-              <p className="text-gray-300">{formatDate(nextPass.time)}</p>
-              <p className="text-sm text-gray-400 mt-1">
-                Visible for ~{nextPass.duration} minutes
-              </p>
-            </div>
-          ) : (
-            <p className="text-gray-400">No upcoming passes found</p>
-          )}
-        </div>
-
-        <div className="card">
-          <h2 className="text-xl font-bold mb-4">Current ISS Position</h2>
-          {issPosition ? (
-            <div>
-              <p className="text-gray-300">
-                {Math.abs(issPosition.lat).toFixed(2)}° {issPosition.lat >= 0 ? 'N' : 'S'}, 
-                {Math.abs(issPosition.lng).toFixed(2)}° {issPosition.lng >= 0 ? 'E' : 'W'}
-              </p>
-              <p className="text-sm text-gray-400 mt-1">
-                Updated: {new Date().toLocaleTimeString()}
-              </p>
-            </div>
-          ) : (
-            <div className="animate-pulse">
-              <div className="h-4 bg-gray-700 rounded w-3/4"></div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="card p-0 overflow-hidden" style={{ height: '500px' }}>
-        <MapContainer 
-          center={[0, 0]} 
-          zoom={2} 
-          style={{ height: '100%', width: '100%' }}
-          ref={mapRef}
-          attributionControl={false}
-        >
-          <MapController position={issPosition} />
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          />
-          {issPosition && (
-            <Marker position={[issPosition.lat, issPosition.lng]}>
-              <Popup>
-                <div className="text-center">
-                  <div className="font-bold mb-1">International Space Station</div>
-                  <div className="text-sm">
-                    {issPosition.lat > 0 ? '↑ North' : '↓ South'} {Math.abs(issPosition.lat).toFixed(2)}°
-                    <br />
-                    {issPosition.lng > 0 ? '→ East' : '← West'} {Math.abs(issPosition.lng).toFixed(2)}°
+        <div className="card" style={{ height: '600px', padding: '0', overflow: 'hidden', maxWidth: '1200px', margin: '0 auto' }}>
+          <MapContainer 
+            center={[0, 0]} 
+            zoom={2} 
+            style={{ height: '100%', width: '100%' }}
+            ref={mapRef}
+            attributionControl={false}
+          >
+            <MapController position={issPosition} />
+            <TileLayer
+              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            />
+            {issPosition && (
+              <Marker position={[issPosition.lat, issPosition.lng]}>
+                <Popup>
+                  <div className="text-center">
+                    <div className="font-bold mb-1">International Space Station</div>
+                    <div className="text-sm">
+                      {issPosition.lat > 0 ? '↑ North' : '↓ South'} {Math.abs(issPosition.lat).toFixed(2)}°
+                      <br />
+                      {issPosition.lng > 0 ? '→ East' : '← West'} {Math.abs(issPosition.lng).toFixed(2)}°
+                    </div>
                   </div>
-                </div>
-              </Popup>
-            </Marker>
-          )}
-          {currentLocation && (
-            <Marker 
-              position={[currentLocation.lat, currentLocation.lng]}
-              icon={L.divIcon({
-                html: '📍',
-                className: 'text-2xl',
-                iconSize: [24, 24],
-                iconAnchor: [12, 24]
-              })}
-            >
-              <Popup>{locationName}</Popup>
-            </Marker>
-          )}
-        </MapContainer>
-      </div>
+                </Popup>
+              </Marker>
+            )}
+            {currentLocation && (
+              <Marker 
+                position={[currentLocation.lat, currentLocation.lng]}
+                icon={L.divIcon({
+                  html: '📍',
+                  className: 'text-2xl',
+                  iconSize: [24, 24],
+                  iconAnchor: [12, 24]
+                })}
+              >
+                <Popup>{locationName}</Popup>
+              </Marker>
+            )}
+          </MapContainer>
+        </div>
 
-      <div className="mt-6 text-sm text-gray-400">
-        <p>
-          The ISS orbits Earth approximately every 90 minutes at an altitude of about 400 kilometers (250 miles).
-          It travels at a speed of roughly 28,000 kilometers per hour (17,500 mph).
-        </p>
-      </div>
+        <div style={{ maxWidth: '1200px', margin: '30px auto', textAlign: 'center' }}>
+          <p style={{ opacity: '0.7', fontSize: '14px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+            THE ISS ORBITS EARTH APPROXIMATELY EVERY 90 MINUTES AT AN ALTITUDE OF ABOUT 400 KILOMETERS (250 MILES).
+            IT TRAVELS AT A SPEED OF ROUGHLY 28,000 KILOMETERS PER HOUR (17,500 MPH).
+          </p>
+        </div>
+      </section>
     </div>
   );
 };
